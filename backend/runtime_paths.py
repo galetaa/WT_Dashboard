@@ -11,7 +11,8 @@ def frontend_dir():
 
 
 def data_dir():
-    return Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "WTDashboard"
+    base = Path(os.environ["LOCALAPPDATA"]) if os.environ.get("LOCALAPPDATA") else Path.home()
+    return base / "WTDashboard"
 
 
 def database_path():

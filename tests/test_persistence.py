@@ -4,6 +4,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from contextlib import closing
 from unittest.mock import patch
 
 import httpx
@@ -78,7 +79,7 @@ class BattlePersistenceTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(sessions[0]["my_name"])
 
         # Reopen the file independently, as after a server restart.
-        with sqlite3.connect(self.db_path) as connection:
+        with closing(sqlite3.connect(self.db_path)) as connection:
             self.assertEqual(connection.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertIsNotNone(connection.execute("SELECT end_ts FROM sessions").fetchone()[0])
             self.assertGreater(connection.execute("SELECT COUNT(*) FROM events").fetchone()[0], 0)

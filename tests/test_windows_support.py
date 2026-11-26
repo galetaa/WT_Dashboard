@@ -46,7 +46,7 @@ class WindowsPathsTests(unittest.TestCase):
             with patch("game_paths.sys.platform", "win32"), \
                  patch("game_paths.game_processes", return_value=[process]), \
                  patch("game_paths.registry_value", side_effect=lambda h,k,n: str(root / "installed") if n=="InstallLocation" else None), \
-                 patch.dict(os.environ, {}, clear=True):
+                 patch.dict(os.environ, {"USERPROFILE":str(root)}, clear=True):
                 self.assertIn(root / "running", game_paths.game_directories())
                 self.assertIn(root / "installed/.game_logs", rewards.log_directories())
 
