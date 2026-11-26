@@ -26,7 +26,7 @@ class WindowsPathsTests(unittest.TestCase):
                  patch.dict(os.environ, {"LOCALAPPDATA": str(root / "local")}, clear=True):
                 self.assertEqual(runtime_paths.image_cache_dir(), root / "local/WTDashboard/cache/vehicle-images")
             with patch.dict(os.environ, {"WT_DB_PATH": str(root / "custom/battles.db")}):
-                self.assertEqual(runtime_paths.database_path(), root / "custom/battles.db")
+                self.assertEqual(runtime_paths.database_path(), (root / "custom/battles.db").resolve())
 
     def test_secondary_steam_library_and_custom_install_name(self):
         with tempfile.TemporaryDirectory() as folder:
