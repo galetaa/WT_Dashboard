@@ -1,7 +1,8 @@
+import asyncio
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock, Mock
 
 import analysis
 import db
@@ -58,6 +59,19 @@ class VehicleIdentityTests(unittest.TestCase):
         session = db.get_session(session_id)["session"]
         self.assertEqual(session["army"], "tank")
         self.assertEqual(session["vehicle_type"], "tankModels/germ_wiesel_1_mk20")
+
+    def test_map_is_verified_only_after_real_spawn_and_fresh_fetch(self):
+        response = Mock(content=b"fresh-map", headers={"content-type":"image/jpeg"})
+        self.tracker._client = Mock(get=AsyncMock(return_value=response))
+        self.tracker.latest["map_info"] = {"valid":True}
+        with patch("poller.time.time",return_value=1001):
+            asyncio.run(self.tracker._poll_map_image())
+        self.assertFalse(db.get_session(self.tracker._session_id)["session"]["map_image_verified"])
+        self.vehicle(4,"tankModels/germ_wiesel_1_mk20")
+        with patch("poller.time.time",return_value=1005):
+            asyncio.run(self.tracker._poll_map_image())
+        self.assertTrue(db.get_session(self.tracker._session_id)["session"]["map_image_verified"])
+        self.assertEqual(db.get_session_map_image(self.tracker._session_id)[0],b"fresh-map")
 
     def test_matching_vehicle_resolves_identity_after_switch(self):
         self.vehicle(2, "tankModels/germ_jaguar_2")

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" role="img" aria-label="Generic tracked vehicle illustration">
+  <g fill="none" stroke="#7f8a99" stroke-width="5" stroke-linejoin="round">
+    <path fill="#27313d" d="M104 190h394l39 26-18 39H106l-30-25z"/>
+    <path fill="#354352" d="M119 183l33-48h272l48 48z"/>
+    <path fill="#435364" d="M212 132l12-51h114l34 50z"/>
+    <path fill="#435364" d="M332 92h205v13H343z"/>
+    <path d="M256 81V61h58v20M159 169h260M104 207h391"/>
+    <g fill="#18212b"><circle cx="128" cy="230" r="17"/><circle cx="183" cy="230" r="17"/><circle cx="238" cy="230" r="17"/><circle cx="293" cy="230" r="17"/><circle cx="348" cy="230" r="17"/><circle cx="403" cy="230" r="17"/><circle cx="458" cy="230" r="17"/></g>
+  </g>
+</svg>

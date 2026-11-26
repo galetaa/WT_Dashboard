@@ -2,11 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WT Dashboard</title>
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/history.css">
 </head>
 <body>
   <header id="topbar">
+    <strong class="dashboard-brand">WT Dashboard</strong>
     <div class="status">
       <span id="conn-dot" class="dot"></span>
       <span id="conn-label">Connecting...</span>
@@ -19,6 +22,13 @@
       <select id="session-select"></select>
     </div>
   </header>
+
+  <nav class="view-tabs" aria-label="Dashboard views">
+    <button id="live-tab" type="button" aria-controls="live-view" aria-pressed="true">Live</button>
+    <button id="history-tab" type="button" aria-controls="history-view" aria-pressed="false">History & statistics</button>
+  </nav>
+
+  <div id="live-view">
 
   <div id="air-warning-banner" class="air-warning">No air threats detected</div>
 
@@ -118,7 +128,108 @@
     </section>
     -->
   </main>
+  </div>
+
+  <section id="history-view" class="history-view" hidden>
+    <div class="history-heading">
+      <h1>Battle history</h1>
+      <button id="history-sync" class="history-button" type="button">Refresh records</button>
+    </div>
+    <form id="history-filter" class="history-filter">
+      <label>Period<select id="history-period">
+        <option value="today">Today</option><option value="3">Last 3 hours</option>
+        <option value="6">Last 6 hours</option><option value="12">Last 12 hours</option>
+        <option value="24" selected>Last 24 hours</option><option value="72">Last 3 days</option>
+        <option value="168">Last 7 days</option><option value="custom">Custom hours</option>
+        <option value="all">All time</option>
+      </select></label>
+      <label>Hours<input id="history-hours" type="number" min="0.1" max="87600" step="0.1" value="6" disabled></label>
+      <button class="history-button primary" type="submit">Apply</button>
+      <span class="history-muted">Whole battles, grouped by completion time · local time</span>
+    </form>
+    <div id="history-status" class="history-status" role="status" aria-live="polite">Loading history…</div>
+    <div id="history-totals" class="history-totals"></div>
+    <div id="period-rates" class="period-rates"></div>
+    <p class="history-note">Battle XP may differ from vehicle research RP. SL includes rewards and penalties, before repairs and ammunition. A dash means the available records do not establish a value.</p>
+    <details class="history-panel period-vehicles"><summary>Vehicle totals for this period</summary>
+      <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Vehicle</th><th>Battles</th><th>Observed time</th><th>Distance</th><th>Kills / losses</th><th>Vehicle XP</th><th>Vehicle SL</th></tr></thead><tbody id="period-vehicles"></tbody></table></div>
+      <p class="history-note">Vehicle reward components can exclude bonuses awarded to the battle as a whole. Unknown values are not counted as zero.</p>
+    </details>
+    <div class="history-panel">
+      <div class="history-panel-heading"><h2>Recorded battles</h2><span id="history-count" class="history-muted"></span></div>
+      <div class="history-table-wrap"><table class="history-table">
+        <thead><tr><th>Battle</th><th>Vehicles</th><th>Result</th><th>Duration</th><th>XP</th><th>SL</th><th></th></tr></thead>
+        <tbody id="battle-rows"></tbody>
+      </table></div>
+      <button id="history-more" class="history-button" type="button" hidden>Load more battles</button>
+    </div>
+
+    <section id="battle-detail" class="history-panel battle-detail" hidden>
+      <div class="history-panel-heading"><h2 id="battle-title" tabindex="-1"></h2>
+        <div class="detail-actions"><button id="details-expand" type="button" class="history-button">Expand sections</button><button id="details-collapse" type="button" class="history-button">Collapse sections</button>
+        <a id="battle-export" class="history-button" download>Download battle JSON</a></div></div>
+      <div id="battle-summary" class="battle-summary"></div>
+      <div id="vehicle-gallery" class="vehicle-gallery"></div>
+      <p class="image-credit">Vehicle illustrations: <a href="https://wiki.warthunder.com/" target="_blank" rel="noopener">War Thunder Wiki / Gaijin</a>. Generic illustration shown when a unit image is unavailable.</p>
+      <div class="battle-layout">
+        <section class="history-subpanel">
+          <h3>Route playback</h3>
+          <div class="route-toolbar"><label>Vehicle<select id="route-vehicle"><option value="all">All vehicles</option></select></label>
+            <label>Run<select id="route-run"><option value="all">All recorded runs</option></select></label></div>
+          <div class="map-controls">
+            <label><input type="checkbox" id="route-background" checked> Map image</label>
+            <label><input type="checkbox" id="route-grid" checked> Grid</label>
+            <label>Opacity <input type="range" id="map-opacity" min="20" max="100" value="85" aria-label="Map image opacity"></label>
+            <button id="map-zoom-in" type="button" class="history-button" aria-label="Zoom into map">+</button>
+            <button id="map-zoom-out" type="button" class="history-button" aria-label="Zoom out of map">−</button>
+            <button id="map-reset" type="button" class="history-button">Reset view</button>
+          </div>
+          <div class="route-map"><canvas id="route-canvas" width="900" height="900" aria-label="Recorded route over the battle map"></canvas></div>
+          <div class="route-playback"><button id="route-back" type="button" class="history-button" aria-label="Back five seconds">−5s</button><button id="route-play" class="history-button" type="button" aria-label="Play or pause route">▶</button>
+            <input id="route-time" type="range" min="0" max="1" value="1" step="1" aria-label="Route time">
+            <button id="route-forward" type="button" class="history-button" aria-label="Forward five seconds">+5s</button>
+            <select id="playback-speed" aria-label="Playback speed"><option value="1">1×</option><option value="5">5×</option><option value="15">15×</option><option value="30" selected>30×</option><option value="60">60×</option></select>
+            <output id="route-clock"></output></div>
+          <div id="route-legend" class="route-legend"></div>
+          <p id="route-note" class="history-note"></p>
+          <p class="history-note">Click near a route point to inspect its time. Drag the map to pan when zoomed in. Lines break at new runs and missing positions.</p>
+          <details class="detail-section"><summary>Recorded runs</summary><div id="run-list"></div></details>
+        </section>
+        <section class="history-subpanel battle-side">
+          <h3>Vehicle at selected time</h3><p id="snapshot-time" class="history-muted"></p>
+          <div id="route-snapshot" class="snapshot-table"></div>
+          <button id="sample-open" type="button" class="history-button" disabled>Inspect complete recorded sample</button>
+          <details class="detail-section" open><summary>All telemetry fields &amp; ranges</summary>
+            <label class="inspector-filter">Filter fields<input id="parameter-search" type="search" placeholder="Speed, crew, engine, raw field name…"></label>
+            <div id="route-raw" class="history-table-wrap raw-parameters"></div>
+            <p class="history-note">Ranges and means are calculated from samples of this vehicle in this battle, not from advertised vehicle specifications.</p>
+          </details>
+          <h3>Reward breakdown</h3>
+          <label class="inline-check"><input id="reward-zero" type="checkbox"> Include zero values</label>
+          <div class="history-table-wrap"><table class="history-table reward-table"><thead><tr><th>Action</th><th>XP</th><th>SL</th></tr></thead><tbody id="reward-rows"></tbody></table></div>
+        </section>
+      </div>
+      <section class="history-subpanel telemetry-chart-panel">
+        <div class="history-panel-heading"><h3>Telemetry over time</h3><label class="inline-select">Metric<select id="chart-metric"></select></label></div>
+        <canvas id="telemetry-chart" width="1200" height="230" aria-label="Recorded telemetry chart"></canvas><p id="chart-caption" class="history-note"></p>
+      </section>
+      <h3>Vehicle comparison</h3>
+      <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Vehicle</th><th>Runs*</th><th>Observed time</th><th>Moving / idle</th><th>Distance</th><th>Mean / max speed</th><th>Min. crew</th><th>Kills / losses</th><th>XP</th><th>SL</th></tr></thead><tbody id="battle-vehicles"></tbody></table></div>
+      <p class="history-note">* Runs are inferred from vehicle changes and route discontinuities, not confirmed death counts. Travel between samples may be missed. Kills cannot be split between variants sharing the same combat-log name.</p>
+      <details class="detail-section history-subpanel"><summary>Damage, fires and repairs</summary><div id="battle-conditions"></div></details>
+      <details class="detail-section history-subpanel"><summary>Recorded player roster</summary><p class="history-note">Teams are inferred from combat relationships, not an official scoreboard. Disconnected players and friendly fire can affect this inference.</p><label class="inspector-filter">Find player or vehicle<input type="search" id="roster-search" placeholder="Player or vehicle…"></label><div id="battle-roster"></div></details>
+      <details class="detail-section history-subpanel battle-events" open><summary id="battle-events-title">Combat event timeline</summary>
+        <div class="event-filters"><input id="event-search" type="search" placeholder="Find player, vehicle or message…" aria-label="Search combat events"><select id="event-scope" aria-label="Event scope"><option value="all">All recorded events</option><option value="own">Local player only</option><option value="kills">Local player kills</option><option value="losses">Local player losses</option></select><select id="event-type" aria-label="Event type"><option value="all">All event types</option></select></div>
+        <div id="battle-events"></div><button id="events-more" class="history-button" type="button" hidden>Load more events</button>
+      </details>
+      <details class="detail-section history-subpanel"><summary>Battle context, mission &amp; recording coverage</summary><div id="battle-context"></div><div id="mission-details"></div></details>
+      <details class="detail-section history-subpanel"><summary>Complete recorded battle &amp; reward metadata</summary><p class="history-note">Exact stored fields are available below. The battle JSON export also includes every raw telemetry row.</p><div id="battle-raw"></div></details>
+    </section>
+  </section>
+  <dialog id="sample-dialog" class="record-dialog"><div class="history-panel-heading"><h2 id="sample-title">Recorded sample</h2><div class="detail-actions"><button id="sample-download" class="history-button" type="button">Download sample JSON</button><button id="sample-close" class="history-button" type="button">Close</button></div></div><p class="history-note">Expand any object or array to inspect all of its recorded fields. Map objects are only what the game actually exposed at this moment.</p><div id="sample-content"></div></dialog>
 
   <script src="/static/app.js"></script>
+  <script src="/static/history-inspector.js"></script>
+  <script src="/static/history.js"></script>
 </body>
 </html>

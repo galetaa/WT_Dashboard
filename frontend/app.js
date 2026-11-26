@@ -540,7 +540,7 @@ function renderHeader(data) {
     label.textContent = data.in_match ? "In Match" : "Connected (hangar)";
   } else {
     dot.classList.remove("live");
-    label.textContent = "War Thunder not detected";
+    label.textContent = document.body.dataset.view === "history" ? "Game closed · history available" : "War Thunder not detected";
   }
 
   document.getElementById("veh-army").textContent = data.indicators.army || "-";

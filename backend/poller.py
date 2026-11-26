@@ -81,6 +81,7 @@ class TelemetryPoller:
         self.subscribers: set[asyncio.Queue] = set()
         self._session_id: int | None = None
         self._session_vehicle_set = False
+        self._session_map_captured = False
         self._last_evt = 0
         self._last_dmg = 0
         self._my_name: str | None = None
@@ -167,6 +168,11 @@ class TelemetryPoller:
             resp.raise_for_status()
             self.map_image = resp.content
             self.map_image_type = resp.headers.get("content-type", "image/jpeg")
+            if (self._session_id is not None and not self._session_map_captured
+                    and self._session_vehicle_set and self.latest["map_info"].get("valid")
+                    and self._session_start_wall is not None and time.time()-self._session_start_wall >= 2):
+                db.set_session_map_image(self._session_id, self.map_image, self.map_image_type)
+                self._session_map_captured = True
         except httpx.HTTPError:
             pass
 
@@ -176,6 +182,7 @@ class TelemetryPoller:
         # doing so previously caused old, already-seen kills to be replayed into new
         # sessions. The cursor only advances forward, across session boundaries.
         if is_valid and not was_valid:
+            self._session_map_captured = False
             self._session_vehicle_set = analysis.is_real_vehicle(indicators.get("type"))
             self._session_id = db.start_session(
                 indicators.get("army") if self._session_vehicle_set else None,
@@ -565,9 +572,11 @@ class TelemetryPoller:
                         self._match_invalid_since = now
                     is_valid = (now - self._match_invalid_since) < MATCH_END_DEBOUNCE
 
+                # A disconnect can also end a battle. Keep the same debounce
+                # as a hangar return so a brief API outage won't split it.
+                self._handle_match_transition(was_valid, is_valid, indicators or {})
+                was_valid = is_valid
                 if connected:
-                    self._handle_match_transition(was_valid, is_valid, indicators or {})
-                    was_valid = is_valid
                     self.latest["state"] = state or {}
                     self.latest["indicators"] = indicators or {}
                     if is_valid:
@@ -577,8 +586,6 @@ class TelemetryPoller:
                         if self._my_name is None and self._pending_deaths:
                             self._correlate_deaths()
                 else:
-                    was_valid = False
-                    self._match_invalid_since = None
                     self.latest["state"] = {}
                     self.latest["indicators"] = {}
 
@@ -623,4 +630,9 @@ class TelemetryPoller:
                 await self._broadcast()
                 await asyncio.sleep(STATE_INTERVAL)
         finally:
-            await self._client.aclose()
+            try:
+                # The Steam lifecycle service may stop us before a hangar
+                # transition is seen. Finalize the recorded battle on exit.
+                self._handle_match_transition(self._session_id is not None, False, {})
+            finally:
+                await self._client.aclose()

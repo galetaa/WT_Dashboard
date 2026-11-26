@@ -62,11 +62,43 @@ CREATE TABLE IF NOT EXISTS telemetry_samples (
     map_info_json TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_telemetry_session ON telemetry_samples(session_id);
+CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
+CREATE TABLE IF NOT EXISTS log_import_state (
+    source TEXT PRIMARY KEY,
+    cursor_json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS battle_reward_records (
+    source TEXT NOT NULL,
+    source_offset INTEGER NOT NULL,
+    ts REAL NOT NULL,
+    session_id INTEGER,
+    xp INTEGER,
+    silver INTEGER,
+    details_json TEXT NOT NULL,
+    PRIMARY KEY (source, source_offset)
+);
+CREATE INDEX IF NOT EXISTS idx_rewards_session ON battle_reward_records(session_id);
+CREATE TABLE IF NOT EXISTS imported_combat_events (
+    source TEXT NOT NULL,
+    source_offset INTEGER NOT NULL,
+    ts REAL NOT NULL,
+    session_id INTEGER,
+    msg TEXT NOT NULL,
+    parsed_json TEXT NOT NULL,
+    PRIMARY KEY (source, source_offset)
+);
+CREATE INDEX IF NOT EXISTS idx_event_timestamp ON events(session_id,ts);
+CREATE TABLE IF NOT EXISTS session_metrics (
+    session_id INTEGER PRIMARY KEY,
+    sample_id INTEGER NOT NULL,
+    event_count INTEGER NOT NULL,
+    summary_json TEXT NOT NULL
+);
 """
 
 
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
@@ -82,6 +114,13 @@ def _migrate(conn):
         conn.execute("ALTER TABLE sessions ADD COLUMN my_name TEXT")
     if "provisional_my_name" not in cols:
         conn.execute("ALTER TABLE sessions ADD COLUMN provisional_my_name TEXT")
+    for column, sql_type in (
+        ("xp", "INTEGER"), ("silver", "INTEGER"),
+        ("rewards_ts", "REAL"), ("rewards_source", "TEXT"),
+        ("map_image_verified", "INTEGER NOT NULL DEFAULT 0"),
+    ):
+        if column not in cols:
+            conn.execute(f"ALTER TABLE sessions ADD COLUMN {column} {sql_type}")
 
     event_cols = {row[1] for row in conn.execute("PRAGMA table_info(events)")}
     for col in ("verb", "actor_name", "actor_vehicle", "target_name", "target_vehicle"):
@@ -120,6 +159,15 @@ def get_session_map_image(session_id: int):
     return row["map_image"], row["map_image_type"]
 
 
+def set_session_map_image(session_id: int, image: bytes, image_type: str):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE sessions SET map_image=?, map_image_type=?, map_image_verified=1 WHERE id=?",
+            (image, image_type, session_id),
+        )
+    conn.close()
+
+
 def end_session(session_id: int):
     conn = get_conn()
     conn.execute(
@@ -144,6 +192,14 @@ def log_event(session_id: int, kind: str, raw: dict, msg: str = None, match_time
               is_enemy: bool = None, verb: str = None, actor_name: str = None,
               actor_vehicle: str = None, target_name: str = None, target_vehicle: str = None):
     conn = get_conn()
+    # CLog and the HTTP kill feed may report the same event a few seconds apart.
+    if msg and conn.execute(
+        """SELECT 1 FROM events WHERE session_id=? AND msg=? AND ABS(ts-?)<=4
+           AND json_extract(raw_json,'$.source')='clog' LIMIT 1""",
+        (session_id, msg, time.time()),
+    ).fetchone():
+        conn.close()
+        return
     conn.execute(
         """INSERT INTO events
            (session_id, ts, match_time, kind, msg, is_enemy, verb, actor_name, actor_vehicle, target_name, target_vehicle, raw_json)
@@ -209,7 +265,8 @@ def get_session_telemetry(session_id: int):
 
 SESSION_COLUMNS = """
     id, start_ts, end_ts, army, vehicle_type, my_name, provisional_my_name,
-    (map_image IS NOT NULL) AS has_map_image
+    (map_image IS NOT NULL) AS has_map_image, map_image_verified,
+    xp, silver, rewards_ts, rewards_source
 """
 
 
