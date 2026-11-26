@@ -10,14 +10,15 @@ from unittest.mock import Mock, patch
 import game_paths
 import rewards
 import runtime_paths
-import windows_launcher
+import launcher
 
 
 class WindowsPathsTests(unittest.TestCase):
     def test_frozen_assets_and_persistent_database_are_separate(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            with patch.object(sys, "frozen", True, create=True), \
+            with patch("runtime_paths.sys.platform", "win32"), \
+                 patch.object(sys, "frozen", True, create=True), \
                  patch.object(sys, "_MEIPASS", str(root / "extracted"), create=True), \
                  patch.dict(os.environ, {"LOCALAPPDATA": str(root / "local")}, clear=True):
                 self.assertEqual(runtime_paths.frontend_dir(), root / "extracted/frontend")
@@ -40,6 +41,8 @@ class WindowsPathsTests(unittest.TestCase):
             self.assertIn(library / "steamapps/common/Custom WT", game_paths.steam_game_directories(steam))
 
     def test_running_game_and_registry_install_are_discovered(self):
+        game_paths._observed_game_dirs.clear()
+        self.addCleanup(game_paths._observed_game_dirs.clear)
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             process = SimpleNamespace(info={"name":"aces.exe", "exe":str(root / "running/win64/aces.exe")})
@@ -79,21 +82,21 @@ class WindowsSessionTests(unittest.IsolatedAsyncioTestCase):
         real_sleep = asyncio.sleep
         async def fast_sleep(_):
             await real_sleep(.001)
-        with patch("windows_launcher.game_processes", side_effect=[[object()], [], [], []]), \
-             patch("windows_launcher.open_browser", return_value="owned") as opened, \
-             patch("windows_launcher.close_browser", side_effect=lambda _:order.append("browser closed")), \
-             patch("windows_launcher.asyncio.sleep", side_effect=fast_sleep):
+        with patch("launcher.game_processes", side_effect=[[object()], [], [], []]), \
+             patch("launcher.open_browser", return_value="owned") as opened, \
+             patch("launcher.close_browser", side_effect=lambda _:order.append("browser closed")), \
+             patch("launcher.asyncio.sleep", side_effect=fast_sleep):
             server = Server()
-            await asyncio.wait_for(windows_launcher.supervise(server,"http://local/",True,True), 2)
+            await asyncio.wait_for(launcher.supervise(server,"http://local/",True,True), 2)
         self.assertTrue(server.should_exit)
         opened.assert_called_once_with("http://local/",managed=True)
         self.assertEqual(order,["lifespan saved","browser closed"])
 
     async def test_game_start_timeout_does_not_start_dashboard(self):
-        with patch("windows_launcher.game_processes",return_value=[]), \
-             patch("windows_launcher.time.monotonic",side_effect=[0,2]):
+        with patch("launcher.game_processes",return_value=[]), \
+             patch("launcher.time.monotonic",side_effect=[0,2]):
             with self.assertRaises(TimeoutError):
-                await windows_launcher.wait_for_game(1)
+                await launcher.wait_for_game(1)
 
     async def test_manual_mode_does_not_stop_when_game_is_closed(self):
         class Server:
@@ -102,6 +105,6 @@ class WindowsSessionTests(unittest.IsolatedAsyncioTestCase):
             async def serve(self):
                 await asyncio.sleep(.01)
                 self.should_exit = True
-        with patch("windows_launcher.game_processes") as processes, patch("windows_launcher.close_browser"):
-            await windows_launcher.supervise(Server(),"http://local/",False,False)
+        with patch("launcher.game_processes") as processes, patch("launcher.close_browser"):
+            await launcher.supervise(Server(),"http://local/",False,False)
         processes.assert_not_called()

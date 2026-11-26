@@ -226,5 +226,5 @@ async def ws_live(websocket: WebSocket):
 
 
 if __name__ == "__main__":
-    from windows_launcher import run
+    from launcher import run
     run(app)

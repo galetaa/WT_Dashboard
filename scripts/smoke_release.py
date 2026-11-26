@@ -1,8 +1,10 @@
-"""Exercise the actual Windows bundle, including its offline data and UI assets."""
+"""Exercise a native release bundle, including offline data and UI assets."""
 import json
 import os
 import socket
+import shutil
 import sqlite3
+import sys
 
 import psutil
 import subprocess
@@ -12,18 +14,24 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from build_release import target_name
+
 
 def main():
-    executable = Path(__file__).resolve().parent.parent / "dist/wt-dashboard.exe"
+    repository = Path(__file__).resolve().parent.parent
+    binary = "wt-dashboard.exe" if sys.platform=="win32" else "wt-dashboard"
+    archive = repository / "dist" / (target_name() + (".zip" if sys.platform=="win32" else ".tar.gz"))
     with tempfile.TemporaryDirectory() as folder:
         root = Path(folder)
+        shutil.unpack_archive(archive,root / "extracted")
+        executable = root / "extracted" / target_name() / binary
         # Detect a free port; run outside the repository to catch asset path bugs.
         with socket.socket() as sock:
             sock.bind(("127.0.0.1",0))
             port = sock.getsockname()[1]
-        env = {**os.environ, "LOCALAPPDATA":str(root), "WT_LOG_DIR":str(root / "empty-logs")}
+        env = {**os.environ, "WT_DATA_DIR":str(root / "data"), "WT_LOG_DIR":str(root / "empty-logs")}
         env.pop("WT_DB_PATH",None)
-        database = root / "WTDashboard/stats.db"
+        database = root / "data/stats.db"
         database.parent.mkdir()
         connection = sqlite3.connect(database)
         connection.execute("CREATE TABLE sessions(id INTEGER PRIMARY KEY,start_ts REAL,end_ts REAL,army TEXT,vehicle_type TEXT)")
@@ -54,20 +62,29 @@ def main():
                 assert get("/static/"+name),name
             assert len(json.loads(get("/static/vehicle_names.json"))) > 3000
             assert json.loads(get("/api/history"))["total"] == 1
-            expected = json.loads((executable.parent.parent / "frontend/vehicle_names.json").read_text(encoding="utf-8"))[unit]
+            expected = json.loads((repository / "frontend/vehicle_names.json").read_text(encoding="utf-8"))[unit]
             assert json.loads(get("/api/history/1"))["summary"]["vehicles"][0]["name"] == expected
-            assert (root / "WTDashboard/stats.db").is_file()
-            print("PASS: packaged server, frontend assets, vehicle names, history and persistent Windows data path")
+            assert (root / "data/stats.db").is_file()
+            print("PASS: packaged server, frontend assets, vehicle names, history and persistent platform data path")
         finally:
             # CI owns this child. Battle shutdown is separately tested via lifespan.
-            parent = psutil.Process(process.pid)
-            owned = [*reversed(parent.children(recursive=True)), parent]
-            for child in owned:
-                try:
-                    child.terminate()
-                except psutil.NoSuchProcess:
-                    pass
-            psutil.wait_procs(owned,timeout=15)
+            try:
+                parent = psutil.Process(process.pid)
+                owned = [*reversed(parent.children(recursive=True)), parent]
+                for child in owned:
+                    try:
+                        child.terminate()
+                    except psutil.NoSuchProcess:
+                        pass
+                _, alive = psutil.wait_procs(owned,timeout=10)
+                for child in alive:
+                    try:
+                        child.kill()
+                    except psutil.NoSuchProcess:
+                        pass
+                psutil.wait_procs(alive,timeout=5)
+            except psutil.NoSuchProcess:
+                pass
             process.wait(timeout=15)
 
 

@@ -9,15 +9,7 @@ try {
         & $Python -m pip install -r backend/requirements.txt pyinstaller
         if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed." }
     }
-    & $Python -m PyInstaller `
-      --noconfirm `
-      --clean `
-      --onefile `
-      --name wt-dashboard `
-      --paths backend `
-      --add-data "frontend;frontend" `
-      --collect-submodules uvicorn `
-      backend/main.py
+    & $Python scripts/build_release.py
     if ($LASTEXITCODE -ne 0) { throw "Executable build failed." }
     Write-Output "Built: $PSScriptRoot\dist\wt-dashboard.exe"
 } finally {

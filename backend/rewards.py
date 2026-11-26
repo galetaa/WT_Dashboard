@@ -127,6 +127,8 @@ def log_directories():
     home = Path.home()
     return list(dict.fromkeys([home / ".config/WarThunder/.game_logs",
             Path(os.getenv("LOCALAPPDATA", str(home))) / "WarThunder/.game_logs",
+            home / "Library/Application Support/WarThunder/.game_logs",
+            home / ".var/app/net.gaijin.WarThunder/config/WarThunder/.game_logs",
             *(folder / ".game_logs" for folder in game_directories())]))
 
 

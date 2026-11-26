@@ -1,16 +1,16 @@
-"""Discover Windows War Thunder installs, including secondary Steam libraries."""
+"""Discover native/Steam War Thunder installs, including secondary libraries."""
 import os
 import re
 import sys
 from pathlib import Path
 
+_observed_game_dirs = set()
+
 
 def game_processes():
-    if sys.platform != "win32":
-        return []
     import psutil
-    return [p for p in psutil.process_iter(["name", "exe"])
-            if (p.info.get("name") or "").casefold() == "aces.exe"]
+    return [p for p in psutil.process_iter(["name", "exe", "cwd"])
+            if (p.info.get("name") or "").casefold() in {"aces", "aces.exe"}]
 
 
 def registry_value(hive, key, name):
@@ -53,25 +53,48 @@ def steam_game_directories(steam):
 
 
 def game_directories():
-    result = []
+    result = list(_observed_game_dirs)
     if os.environ.get("WT_GAME_DIR"):
         result.append(Path(os.environ["WT_GAME_DIR"]).expanduser())
-    if sys.platform != "win32":
-        return result
     for process in game_processes():
         executable = process.info.get("exe")
         if executable:
             folder = Path(executable).parent
-            result.append(folder.parent if folder.name.casefold() in {"win32", "win64"} else folder)
-    for hive in ("HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE"):
-        installed = registry_value(hive, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 236390", "InstallLocation")
-        if installed:
-            result.append(Path(installed))
-    steam = registry_value("HKEY_CURRENT_USER", r"SOFTWARE\Valve\Steam", "SteamPath")
-    roots = [Path(steam)] if steam else []
-    for variable in ("ProgramFiles(x86)", "ProgramFiles"):
-        if os.environ.get(variable):
-            roots.append(Path(os.environ[variable]) / "Steam")
+            result.append(folder.parent if folder.name.casefold() in {"win32", "win64", "linux64", "macosx", "macosx64"} else folder)
+        if process.info.get("cwd"):
+            result.append(Path(process.info["cwd"]))
+    _observed_game_dirs.update(result)
+    roots = []
+    if sys.platform == "win32":
+        for hive in ("HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE"):
+            installed = registry_value(hive, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 236390", "InstallLocation")
+            if installed:
+                result.append(Path(installed))
+        steam = registry_value("HKEY_CURRENT_USER", r"SOFTWARE\Valve\Steam", "SteamPath")
+        if steam:
+            roots.append(Path(steam))
+        for variable in ("ProgramFiles(x86)", "ProgramFiles"):
+            if os.environ.get(variable):
+                roots.append(Path(os.environ[variable]) / "Steam")
+    elif sys.platform == "darwin":
+        roots.append(Path.home() / "Library/Application Support/Steam")
+        result.extend([Path("/Applications/WarThunderLauncher.app/Contents/WarThunder"),
+                       Path.home() / "Applications/WarThunderLauncher.app/Contents/WarThunder"])
+    else:
+        roots.extend([Path.home() / ".steam/steam", Path.home() / ".local/share/Steam",
+                      Path.home() / ".var/app/com.valvesoftware.Steam/data/Steam"])
+    # A macOS client executable lives inside the game's .app bundle.
+    for folder in list(result):
+        if folder.name == "MacOS" and folder.parent.name == "Contents":
+            result.append(folder.parent.parent.parent)
     for root in dict.fromkeys(roots):
         result.extend(steam_game_directories(root))
+    if sys.platform == "darwin":
+        for folder in list(result):
+            for suffix in ("WarThunderLauncher.app/Contents/WarThunder.app/Contents/Resources/game",
+                           "WarThunderLauncher/Contents/WarThunder/Contents/Resources/game",
+                           "Contents/Resources/game"):
+                nested = folder / suffix
+                if nested.is_dir():
+                    result.append(nested)
     return list(dict.fromkeys(result))

@@ -1,4 +1,4 @@
-"""Windows standalone and Steam session entry points; Linux source mode stays manual."""
+"""Standalone and Steam session entry points for Windows, Linux and macOS."""
 import argparse
 import asyncio
 import os
@@ -17,7 +17,7 @@ from runtime_paths import data_dir
 
 def browser_executable():
     candidates = []
-    for name in ("msedge", "chrome"):
+    for name in ("msedge", "google-chrome", "chromium", "chromium-browser", "thorium-browser", "chrome"):
         executable = shutil.which(name)
         if executable:
             candidates.append(Path(executable))
@@ -26,6 +26,11 @@ def browser_executable():
             root = Path(os.environ[variable])
             candidates.extend([root / "Microsoft/Edge/Application/msedge.exe",
                                root / "Google/Chrome/Application/chrome.exe"])
+    if sys.platform == "darwin":
+        for folder in (Path("/Applications"), Path.home() / "Applications"):
+            candidates.extend([folder / "Google Chrome.app/Contents/MacOS/Google Chrome",
+                               folder / "Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+                               folder / "Chromium.app/Contents/MacOS/Chromium"])
     return next((p for p in candidates if p.is_file()), None)
 
 
@@ -117,8 +122,8 @@ async def supervise(server, url, watch_game=False, show_browser=False):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="War Thunder dashboard and recorded battle history")
-    parser.add_argument("--steam", action="store_true", help="Launch War Thunder through Steam and follow its lifetime (Windows)")
-    parser.add_argument("--watch-game", action="store_true", help="Wait for the game, then close the dashboard when it exits (Windows)")
+    parser.add_argument("--steam", action="store_true", help="Launch War Thunder through Steam and follow its lifetime")
+    parser.add_argument("--watch-game", action="store_true", help="Wait for the game, then close the dashboard when it exits")
     parser.add_argument("--start-timeout", type=float, default=600, help="Seconds to wait for the game (default: 600)")
     parser.add_argument("--port", type=int, default=8765)
     group = parser.add_mutually_exclusive_group()
@@ -128,8 +133,6 @@ def parse_args(argv=None):
     args = parser.parse_args(argv)
     if args.start_timeout <= 0 or not 1 <= args.port <= 65535:
         parser.error("Timeout must be positive and port must be between 1 and 65535.")
-    if (args.steam or args.watch_game) and sys.platform != "win32":
-        parser.error("Use scripts/steam_session.py for Linux Steam sessions.")
     return args
 
 
@@ -138,10 +141,14 @@ def run(app, argv=None):
     args = parse_args(argv)
     watch = args.steam or args.watch_game
     if args.steam:
-        os.startfile("steam://rungameid/236390")
+        if sys.platform == "win32":
+            os.startfile("steam://rungameid/236390")
+        else:
+            command = "open" if sys.platform == "darwin" else "xdg-open"
+            subprocess.run([command, "steam://rungameid/236390"], check=True)
     async def session():
         if watch:
-            print("Waiting for War Thunder (aces.exe)…", flush=True)
+            print("Waiting for War Thunder (aces / aces.exe)…", flush=True)
             await wait_for_game(args.start_timeout)
         server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=args.port, loop="asyncio"))
         show = args.browser if args.browser is not None else watch or getattr(sys, "frozen", False)
