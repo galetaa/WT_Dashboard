@@ -1,7 +1,7 @@
 name: Native release builds
 on:
   push:
-    branches: [feat/multiplatform-releases]
+    branches: [main, feat/multiplatform-releases]
     tags: ['v*']
   workflow_dispatch:
 permissions:
