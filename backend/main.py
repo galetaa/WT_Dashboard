@@ -4,7 +4,6 @@ import time
 import logging
 import threading
 from contextlib import asynccontextmanager, suppress
-from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.staticfiles import StaticFiles
@@ -16,6 +15,7 @@ import history
 import vehicle_images
 from rewards import RewardImporter
 from poller import TelemetryPoller
+from runtime_paths import frontend_dir
 
 poller = TelemetryPoller()
 reward_importer = RewardImporter()
@@ -42,13 +42,7 @@ async def enrich_history():
         await asyncio.to_thread(sync_history)
         await asyncio.sleep(10)
 
-# Frozen (PyInstaller) builds extract bundled data next to sys._MEIPASS, not
-# next to this file - the build script adds frontend/ there under the same
-# "frontend" name, so this resolves the same relative layout either way.
-if getattr(sys, "frozen", False):
-    FRONTEND_DIR = Path(sys._MEIPASS) / "frontend"
-else:
-    FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+FRONTEND_DIR = frontend_dir()
 
 # Some browsers will silently reuse a cached app.js/style.css from before a
 # restart even with Cache-Control: no-store, if the original entry was cached
@@ -232,17 +226,5 @@ async def ws_live(websocket: WebSocket):
 
 
 if __name__ == "__main__":
-    import threading
-    import webbrowser
-
-    import uvicorn
-
-    port = 8765
-
-    # Only auto-open a browser for the packaged build - running from source
-    # during development already has a browser tab open/managed manually,
-    # and popping a new one on every restart would get old fast.
-    if getattr(sys, "frozen", False):
-        threading.Timer(1.5, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()
-
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    from windows_launcher import run
+    run(app)

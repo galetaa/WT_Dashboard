@@ -10,6 +10,61 @@ it has no way to see a match remotely.
 
 ## Running it
 
+### Windows / Steam (this branch)
+
+All battle-history features from `feat/battle-history-and-statistics` are
+included: English UI, XP/SL import, vehicle illustrations, map playback,
+telemetry charts, detailed inspectors and period statistics.
+
+Download `wt-dashboard.exe` from a successful **Windows build and tests** run
+under the fork's **Actions** tab (artifact `wt-dashboard-windows`). Extract
+it from the artifact ZIP. Double-clicking the executable opens standalone
+history/live mode; it stays open after the game closes.
+
+For automatic game-session mode, create a Windows shortcut with this target:
+
+```text
+"C:\Tools\WT Dashboard\wt-dashboard.exe" --steam
+```
+
+Adjust the executable path. This starts War Thunder through Steam, waits up
+to ten minutes for `aces.exe`, then opens the dashboard. When the game closes,
+the server finishes saving telemetry/rewards and exits; its dedicated Edge or
+Chrome app window also closes. Other browser windows and Steam stay open.
+If neither browser is found, the default browser opens instead and its tab
+may remain open. `--watch-game` waits for a game started separately, without
+launching Steam. This integration runs when using the dashboard shortcut;
+launching directly from the Steam Library requires `--watch-game` beforehand.
+
+Windows saves the database in `%LOCALAPPDATA%\WTDashboard\stats.db` for both
+source and executable launches. Illustrations are cached in
+`%LOCALAPPDATA%\WTDashboard\cache\vehicle-images`. Back up the database before
+replacing an older installation. To migrate history from a source checkout,
+stop both dashboards and copy its `backend\stats.db` to that data folder.
+`WT_DB_PATH` can explicitly select a different database file.
+
+The importer finds `.game_logs` in the running game's install directory,
+registered Steam install, or secondary Steam libraries. Set `WT_GAME_DIR`
+to the game installation folder if discovery fails, or set `WT_LOG_DIR` to
+the actual `.game_logs` folder (multiple Windows paths separated by `;`).
+Client logs live in the game installation's `.game_logs` directory, as
+[documented by Gaijin](https://support.gaijin.net/hc/en-us/articles/200070121-Bug-reports).
+
+To run from source in PowerShell (Python 3.11+):
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
+.\start.ps1 -Steam
+# Standalone history / live view:
+.\start.ps1
+```
+
+`-NoBrowser` disables browser opening; `-Port 8766` selects another port.
+Closing the console with Ctrl+C saves and stops the server. Keep standalone
+mode open to browse history after playing. Windows builds and packaged-asset
+smoke tests run automatically on pushes to `feat/windows-battle-history`.
+
 ### Linux / Steam
 
 The Steam version uses the same local telemetry API; no Steam launch options
@@ -92,7 +147,8 @@ The English history panel follows the live dashboard's compact styling. Vehicle
 cards show official War Thunder Wiki illustrations, detailed observed statistics
 and links to Wiki specifications. Images are downloaded on demand from
 `static.encyclopedia.warthunder.com` and cached under
-`$XDG_CACHE_HOME/wt-dashboard/vehicle-images` (default `~/.cache`). Only the public
+`%LOCALAPPDATA%\WTDashboard\cache\vehicle-images` on Windows, or
+`$XDG_CACHE_HOME/wt-dashboard/vehicle-images` on Linux (default `~/.cache`). Only the public
 unit ID is sent; if an image is unavailable, a labelled generic illustration is
 shown. Cached images remain available offline.
 
@@ -114,7 +170,8 @@ the battle's JSON export link. Missing data cannot be reconstructed by the UI.
 
 XP and SL are imported automatically from `received SessionStats` in the local
 War Thunder `.clog` files, alongside combat messages missing from the HTTP API.
-Linux defaults to `~/.config/WarThunder/.game_logs`; override with `WT_LOG_DIR`
+Linux defaults to `~/.config/WarThunder/.game_logs`; Windows also discovers
+the game installation. Override with `WT_LOG_DIR`
 (multiple directories can be separated with the OS path separator). Import is
 incremental and idempotent, also scans old logs at startup, and is finalized
 on shutdown. Decoded logs are never written to disk: only whitelisted battle
@@ -134,7 +191,8 @@ battles save a fresh in-match map image marked as verified.
 
 ### Easiest: download the exe
 
-Grab `wt-dashboard.exe` from the [Releases](../../releases) page, put it
+For this branch use the Actions artifact above. Upstream releases may not yet
+include these features. Put `wt-dashboard.exe`
 anywhere, and double-click it. A console window opens (that's the server;
 closing it stops the dashboard) and your browser opens to the dashboard
 automatically. No install, no Python required.
@@ -158,6 +216,8 @@ Then open `http://localhost:8765`.
 ./build.ps1
 ```
 
+Run on Windows with Python 3.11+; the script uses `.venv` when present and
+checks dependency/build failures. It can run from any working directory.
 Produces `dist/wt-dashboard.exe` (PyInstaller, one-file bundle including the
 frontend). See `build.ps1` for the exact flags if you need to reproduce it
 without PowerShell.

@@ -1,23 +1,14 @@
 import json
-import os
 import sqlite3
-import sys
 import time
 from pathlib import Path
 from typing import Optional
 
+from runtime_paths import database_path
+
 
 def _default_db_path() -> Path:
-    # Frozen (PyInstaller) builds run from a temp extraction dir that's wiped
-    # and recreated on every launch - a DB living there would lose all data
-    # between runs. Use a stable per-user location instead, same as any
-    # normal installed Windows app; the source/dev case is unchanged (DB
-    # stays right next to this file, as it always has).
-    if getattr(sys, "frozen", False):
-        base = Path(os.getenv("LOCALAPPDATA", Path.home())) / "WTDashboard"
-        base.mkdir(parents=True, exist_ok=True)
-        return base / "stats.db"
-    return Path(__file__).parent / "stats.db"
+    return database_path()
 
 
 DB_PATH = _default_db_path()

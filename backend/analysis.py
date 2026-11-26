@@ -2,14 +2,14 @@ import json
 import math
 import re
 from collections import defaultdict, deque
-from pathlib import Path
 
 import db
+from runtime_paths import frontend_dir
 
 # Shared with the frontend's premium-highlight/wiki-link matching (see
 # vehicleIndex in frontend/app.js) - one dataset, refreshed by
 # scripts/update_vehicles.py, used by both sides for their own purpose.
-_VEHICLES_JSON_PATH = Path(__file__).parent.parent / "frontend" / "vehicles.json"
+_VEHICLES_JSON_PATH = frontend_dir() / "vehicles.json"
 _AIR_VEHICLE_TYPES = {"fighter", "bomber", "assault", "attack_helicopter", "utility_helicopter"}
 # Some ids in the dataset use full nation words ("ussr_t_80ud"), others use
 # abbreviated ones ("germ_", "cn_", "fr_", "sw_", "it_", "jp_", "il_") - a

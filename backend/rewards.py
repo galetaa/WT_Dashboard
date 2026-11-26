@@ -19,6 +19,7 @@ from pathlib import Path
 
 import db
 import analysis
+from game_paths import game_directories
 
 
 KEY = bytes([
@@ -124,8 +125,9 @@ def log_directories():
     if configured:
         return [Path(value).expanduser() for value in configured.split(os.pathsep) if value]
     home = Path.home()
-    return [home / ".config/WarThunder/.game_logs",
-            Path(os.getenv("LOCALAPPDATA", str(home))) / "WarThunder/.game_logs"]
+    return list(dict.fromkeys([home / ".config/WarThunder/.game_logs",
+            Path(os.getenv("LOCALAPPDATA", str(home))) / "WarThunder/.game_logs",
+            *(folder / ".game_logs" for folder in game_directories())]))
 
 
 def attach_records(conn):

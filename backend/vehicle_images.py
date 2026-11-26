@@ -1,6 +1,5 @@
 """Cache official Wiki unit illustrations; never send battle data upstream."""
 
-import os
 import re
 import tempfile
 import threading
@@ -8,10 +7,11 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from runtime_paths import image_cache_dir
 
 
 IMAGE_HOST = "https://static.encyclopedia.warthunder.com/images"
-CACHE_DIR = Path(os.getenv("XDG_CACHE_HOME", str(Path.home()/".cache"))) / "wt-dashboard/vehicle-images"
+CACHE_DIR = image_cache_dir()
 _lock = threading.Lock()
 _unit_locks = {}
 _retry_after = {}
