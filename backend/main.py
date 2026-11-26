@@ -78,6 +78,7 @@ async def index():
     html = html.replace("/static/app.js", f"/static/app.js?v={ASSET_VERSION}")
     html = html.replace("/static/style.css", f"/static/style.css?v={ASSET_VERSION}")
     html = html.replace("/static/history.js", f"/static/history.js?v={ASSET_VERSION}")
+    html = html.replace("/static/history-combat.js", f"/static/history-combat.js?v={ASSET_VERSION}")
     html = html.replace("/static/history-inspector.js", f"/static/history-inspector.js?v={ASSET_VERSION}")
     html = html.replace("/static/history.css", f"/static/history.css?v={ASSET_VERSION}")
     return HTMLResponse(html, headers={"Cache-Control": "no-store"})

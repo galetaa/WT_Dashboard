@@ -9,6 +9,7 @@ from collections import Counter
 
 import analysis
 import db
+import kill_review
 
 
 def vehicle_label(raw):
@@ -90,6 +91,7 @@ def analyze_session(session_id, include_routes=True):
         fields = set()
         latest_map, latest_mission = {}, {}
         valid_position_count = 0
+        review_frames = []
 
         def get_vehicle(raw):
             if raw not in vehicles:
@@ -112,6 +114,10 @@ def analyze_session(session_id, include_routes=True):
             indicators = json.loads(row["indicators_json"] or "{}")
             mission = json.loads(row["mission_json"] or "{}")
             map_info = json.loads(row["map_info_json"] or "{}")
+            objects = json.loads(row["map_obj_json"] or "[]")
+            if include_routes:
+                review_frames.append({"sample_id":row["id"],"ts":timestamp,"indicators":indicators,
+                    "state":json.loads(row["state_json"] or "{}"),"objects":objects,"map_info":map_info})
             if mission.get("status"):
                 outcome = mission["status"]
             if mission:
@@ -147,7 +153,6 @@ def analyze_session(session_id, include_routes=True):
                 runs.append(active)
                 previous = None
                 gap = 0
-            objects = json.loads(row["map_obj_json"] or "[]")
             own = next((obj for obj in objects if obj.get("icon") == "Player"
                         and number(obj.get("x")) and number(obj.get("y"))
                         and 0 <= obj["x"] <= 1 and 0 <= obj["y"] <= 1), None)
@@ -245,7 +250,8 @@ def analyze_session(session_id, include_routes=True):
         return {"session": session, "summary": summary, "rewards": rewards,
                 "routes": runs, "events": events, "telemetry_fields": sorted(fields),
                 "map_info":latest_map, "mission":latest_mission,
-                "roster":analysis.build_player_roster(session_id)}
+                "roster":analysis.build_player_roster(session_id),
+                "kill_reviews":kill_review.build_reviews(session,events,review_frames)}
     finally:
         conn.close()
 

@@ -106,7 +106,7 @@ window.HistoryInspector = (() => {
     ctx.fillStyle="#0b0e12";ctx.fillRect(0,0,w,h);ctx.font="11px Segoe UI, sans-serif";
     if(!numbers.length){ctx.fillStyle="#8b9aae";ctx.fillText("No numeric samples for this selection.",15,35);el("chart-caption").textContent="";return;}
     let low=Math.min(...numbers),high=Math.max(...numbers);if(low===high){low-=1;high+=1;}
-    const left=58,right=w-15,top=16,bottom=h-30,duration=Math.max(1,data.summary.duration_s);
+    const left=58,right=w-15,top=16,bottom=h-30,duration=Math.max(1,controls.duration?.() || data.summary.duration_s);
     const x=t=>left+t/duration*(right-left),y=value=>bottom-(value-low)/(high-low)*(bottom-top);
     ctx.strokeStyle="#232a33";ctx.fillStyle="#7f8a99";
     for(let i=0;i<=4;i++){const value=low+(high-low)*i/4,py=y(value);ctx.beginPath();ctx.moveTo(left,py);ctx.lineTo(right,py);ctx.stroke();ctx.fillText(fmt(value),3,py+4);}
@@ -127,7 +127,7 @@ window.HistoryInspector = (() => {
     el("events-more").hidden=events.length<=eventLimit;
     el("battle-events").innerHTML=events.slice(0,eventLimit).map(event=>{
       const t=Math.max(0,event.ts-data.session.start_ts);let raw;try{raw=JSON.parse(event.raw_json || "{}");}catch{raw=event.raw_json;}
-      return `<details class="battle-event ${isOwn(event.actor_name)||isOwn(event.target_name)?"own-event":""}"><summary><button type="button" class="event-time" data-seek="${t}">${clock(t)}</button><span>${esc(event.msg || "Untitled event")}</span><small>${raw?.source === "clog"?"Game log":"HTTP feed"}</small></summary><div class="event-data"><div class="snapshot-table">${tablePairs([["Recorded at",new Date(event.ts*1000).toLocaleString("en-GB")],["Game clock",event.match_time == null?"Unknown":clock(event.match_time)],["Actor",event.actor_name || "Unknown"],["Actor vehicle",event.actor_vehicle || "Unknown"],["Target",event.target_name || "Unknown"],["Target vehicle",event.target_vehicle || "Unknown"],["Event type",event.verb || event.kind]])}</div><pre>${esc(JSON.stringify(raw,null,2))}</pre></div></details>`;
+      return `<details class="battle-event ${isOwn(event.actor_name)||isOwn(event.target_name)?"own-event":""}"><summary><button type="button" class="event-time" data-seek="${t}">${clock(t)}</button><span>${esc(event.msg || "Untitled event")}</span><small>${raw?.source === "clog"?"Game log":"HTTP feed"}</small></summary><div class="event-data"><div class="snapshot-table">${tablePairs([["Recorded at",new Date(event.ts*1000).toLocaleString("en-GB")],["Game clock",event.match_time == null?"Unknown":clock(event.match_time)],["Actor",event.actor_name || "Unknown"],["Actor vehicle",event.actor_vehicle || "Unknown"],["Target",event.target_name || "Unknown"],["Target vehicle",event.target_vehicle || "Unknown"],["Event type",event.verb || event.kind]])}</div>${(data.kill_reviews || []).some(k=>k.event_id===event.id)?`<button type="button" class="history-button" data-review-kill="${event.id}">Review kill on map</button>`:""}<pre>${esc(JSON.stringify(raw,null,2))}</pre></div></details>`;
     }).join("") || '<p class="history-note">No recorded events match this filter. Missing messages cannot be reconstructed from telemetry alone.</p>';
   }
   function renderRoster() {
@@ -138,9 +138,9 @@ window.HistoryInspector = (() => {
       return `<h3>${team === "friendly"?"Inferred friendly":team === "enemy"?"Inferred enemy":"Unassigned"} · ${players.length}</h3><table class="history-table"><thead><tr><th>Player</th><th>Observed vehicles / losses</th><th>Last game time</th></tr></thead><tbody>${players.map(p=>`<tr><td>${esc(p.name)}</td><td>${p.vehicles.map(v=>`${esc(v.vehicle)} (${v.deaths})`).join(" · ")}</td><td>${p.last_time == null?"—":clock(p.last_time)}</td></tr>`).join("") || '<tr><td colspan="3">No matching players recorded.</td></tr>'}</tbody></table>`;
     }).join("");
   }
-  async function openSample() {
-    if(!snapshot?.point.sample_id)return;
-    const id=snapshot.point.sample_id,button=el("sample-open"),battle=data.session.id;
+  async function openSample(sampleId=snapshot?.point.sample_id) {
+    if(!sampleId)return;
+    const id=sampleId,button=el("sample-open"),battle=data.session.id;
     button.disabled=true;
     try {
       const response=await fetch(`/api/history/${battle}/samples/${id}`);if(!response.ok)throw new Error("Sample could not be loaded.");
@@ -155,10 +155,11 @@ window.HistoryInspector = (() => {
   el("events-more").addEventListener("click",()=>{eventLimit+=100;renderEvents();});
   for(const id of ["run-list","battle-events"])el(id).addEventListener("click",event=>{const button=event.target.closest("[data-seek]");if(button){event.preventDefault();controls.seek(Number(button.dataset.seek));}});
   el("chart-metric").addEventListener("change",renderChart);
-  el("telemetry-chart").addEventListener("click",event=>{if(!data)return;const r=event.currentTarget.getBoundingClientRect();controls.seek(Math.max(0,Math.min(1,(event.clientX-r.left-58)/(r.width-73)))*data.summary.duration_s);});
-  el("sample-open").addEventListener("click",openSample);
+  el("telemetry-chart").addEventListener("click",event=>{if(!data)return;const r=event.currentTarget.getBoundingClientRect();controls.seek(Math.max(0,Math.min(1,(event.clientX-r.left-58)/(r.width-73)))*(controls.duration?.() || data.summary.duration_s));});
+  el("sample-open").addEventListener("click",()=>openSample());
+  el("battle-events").addEventListener("click",event=>{const button=event.target.closest("[data-review-kill]");if(button)window.HistoryCombat.select(Number(button.dataset.reviewKill),true);});
   el("sample-close").addEventListener("click",()=>el("sample-dialog").close());
   el("sample-download").addEventListener("click",()=>{if(!sampleData)return;const url=URL.createObjectURL(new Blob([JSON.stringify(sampleData,null,2)],{type:"application/json"}));const a=document.createElement("a");a.href=url;a.download=`battle-${data.session.id}-sample-${sampleData.id}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
   for(const [id,open] of [["details-expand",true],["details-collapse",false]])el(id).addEventListener("click",()=>el("battle-detail").querySelectorAll("details.detail-section").forEach(section=>{section.open=open;}));
-  return {renderPeriod,renderBattle,setSnapshot,renderChart,renderRuns};
+  return {renderPeriod,renderBattle,setSnapshot,renderChart,renderRuns,openSample};
 })();

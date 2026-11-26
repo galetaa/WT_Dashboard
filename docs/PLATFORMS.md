@@ -107,6 +107,37 @@ Launching a game directly from the Steam Library does not automatically start
 the dashboard; use `--watch-game` beforehand or the `--steam` shortcut.
 Use Ctrl+C in the console/Terminal to stop standalone mode cleanly.
 
+## Map zoom and kill review
+
+In a battle's **Route playback** panel, scroll the mouse wheel over the map,
+pinch with two fingers, double-click, or use **+ / −** to zoom (up to 16×).
+Wheel/pinch zoom keeps its focal point; drag to pan and **Reset view** to fit the
+whole map again. Route lines and numbered kill markers follow the playhead and
+selected vehicle/run.
+
+Enable **Kill positions** to show your vehicle's recorded positions near kill
+notifications. Click a marker, a **Kills in this battle** card, or **Review kill
+on map** in the event timeline. The **Kill review** panel shows both players and
+vehicles, event time/source, sample offset, position, speed/gear, crew/ammo,
+related combat messages and the original event. Use the selector or arrow
+buttons to move between kills; **Inspect kill sample** opens the complete raw
+telemetry record. Closely overlapping numbered labels are offset, with small
+dots/connectors pointing to their recorded positions.
+
+These are **notification-time positions, not confirmed firing locations**. Only
+preceding samples within 3 seconds are used; missing/stale samples or a different
+credited vehicle remain unassigned. HTTP message time is its reception time and
+can be delayed. Game-log events use the recorded log timestamp.
+
+**Estimated connections** draws a dashed 2D line only when a compatible target
+marker can be matched by a recorded player name, or one compatible enemy marker
+uniquely disappears across nearby continuous samples without simultaneous
+kills. A disappearing marker may have left visibility, so that case is labelled
+an estimate. Capture zones, incompatible unit classes and ambiguous candidates
+are excluded. Distances are approximate map-plane separation, not projectile
+range. The feed does not provide the firing instant or ballistic trajectory;
+when the target is not identifiable, no line or target distance is invented.
+
 ## Saved data and migration
 
 | Platform | Database for release binaries | Vehicle image cache |

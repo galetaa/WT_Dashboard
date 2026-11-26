@@ -58,7 +58,7 @@ def main():
             else:
                 raise TimeoutError("Packaged dashboard did not start")
             assert b"History &amp; statistics" in get("/") or b"History & statistics" in get("/")
-            for name in ("history.js","history-inspector.js","history.css","vehicle-placeholder.svg"):
+            for name in ("history.js","history-inspector.js","history-combat.js","history.css","vehicle-placeholder.svg"):
                 assert get("/static/"+name),name
             assert len(json.loads(get("/static/vehicle_names.json"))) > 3000
             assert json.loads(get("/api/history"))["total"] == 1

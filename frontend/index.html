@@ -179,23 +179,33 @@
           <div class="map-controls">
             <label><input type="checkbox" id="route-background" checked> Map image</label>
             <label><input type="checkbox" id="route-grid" checked> Grid</label>
+            <label><input type="checkbox" id="map-kills" checked> Kill positions</label>
+            <label><input type="checkbox" id="map-kill-lines" checked> Estimated connections</label>
             <label>Opacity <input type="range" id="map-opacity" min="20" max="100" value="85" aria-label="Map image opacity"></label>
             <button id="map-zoom-in" type="button" class="history-button" aria-label="Zoom into map">+</button>
             <button id="map-zoom-out" type="button" class="history-button" aria-label="Zoom out of map">−</button>
             <button id="map-reset" type="button" class="history-button">Reset view</button>
+            <output id="map-zoom-level" aria-live="polite">1.0×</output>
           </div>
           <div class="route-map"><canvas id="route-canvas" width="900" height="900" aria-label="Recorded route over the battle map"></canvas></div>
           <div class="route-playback"><button id="route-back" type="button" class="history-button" aria-label="Back five seconds">−5s</button><button id="route-play" class="history-button" type="button" aria-label="Play or pause route">▶</button>
-            <input id="route-time" type="range" min="0" max="1" value="1" step="1" aria-label="Route time">
+            <input id="route-time" type="range" min="0" max="1" value="1" step="0.01" aria-label="Route time">
             <button id="route-forward" type="button" class="history-button" aria-label="Forward five seconds">+5s</button>
             <select id="playback-speed" aria-label="Playback speed"><option value="1">1×</option><option value="5">5×</option><option value="15">15×</option><option value="30" selected>30×</option><option value="60">60×</option></select>
             <output id="route-clock"></output></div>
           <div id="route-legend" class="route-legend"></div>
           <p id="route-note" class="history-note"></p>
-          <p class="history-note">Click near a route point to inspect its time. Drag the map to pan when zoomed in. Lines break at new runs and missing positions.</p>
+          <p class="history-note">Scroll or pinch to zoom. Drag to pan. Click a numbered kill marker to inspect it, or click near a route point to select its time. Double-click to zoom in. Overlapping labels are offset; small dots mark the recorded positions.</p>
           <details class="detail-section"><summary>Recorded runs</summary><div id="run-list"></div></details>
         </section>
         <section class="history-subpanel battle-side">
+          <section class="kill-review-panel">
+            <div class="history-panel-heading"><h3>Kill review</h3><span id="kill-coverage" class="history-muted"></span></div>
+            <div class="kill-navigation"><button id="kill-previous" class="history-button" type="button" aria-label="Previous kill">←</button><select id="kill-select" aria-label="Select kill"></select><button id="kill-next" class="history-button" type="button" aria-label="Next kill">→</button></div>
+            <div id="kill-details"><p class="history-note">Select a kill marker or an entry below.</p></div>
+            <div class="detail-actions"><button id="kill-focus" class="history-button" type="button" disabled>Show on map</button><button id="kill-sample" class="history-button" type="button" disabled>Inspect kill sample</button></div>
+            <p class="history-note">Markers locate your vehicle near a kill notification. The exact firing instant and projectile path are not recorded. A dashed line is only an estimated 2D connection to an available target marker.</p>
+          </section>
           <h3>Vehicle at selected time</h3><p id="snapshot-time" class="history-muted"></p>
           <div id="route-snapshot" class="snapshot-table"></div>
           <button id="sample-open" type="button" class="history-button" disabled>Inspect complete recorded sample</button>
@@ -213,6 +223,7 @@
         <div class="history-panel-heading"><h3>Telemetry over time</h3><label class="inline-select">Metric<select id="chart-metric"></select></label></div>
         <canvas id="telemetry-chart" width="1200" height="230" aria-label="Recorded telemetry chart"></canvas><p id="chart-caption" class="history-note"></p>
       </section>
+      <details class="detail-section history-subpanel" open><summary id="kill-list-title">Kills in this battle</summary><div id="kill-list" class="kill-list"></div></details>
       <h3>Vehicle comparison</h3>
       <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Vehicle</th><th>Runs*</th><th>Observed time</th><th>Moving / idle</th><th>Distance</th><th>Mean / max speed</th><th>Min. crew</th><th>Kills / losses</th><th>XP</th><th>SL</th></tr></thead><tbody id="battle-vehicles"></tbody></table></div>
       <p class="history-note">* Runs are inferred from vehicle changes and route discontinuities, not confirmed death counts. Travel between samples may be missed. Kills cannot be split between variants sharing the same combat-log name.</p>
@@ -230,6 +241,7 @@
 
   <script src="/static/app.js"></script>
   <script src="/static/history-inspector.js"></script>
+  <script src="/static/history-combat.js"></script>
   <script src="/static/history.js"></script>
 </body>
 </html>

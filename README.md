@@ -140,7 +140,10 @@ includes image-cache paths and additional migration details.
 - English battle history with XP/SL import, daily/last-N-hours/all-time totals,
   per-vehicle aggregates and recording coverage.
 - Vehicle illustrations with local caching and links to War Thunder Wiki.
-- Map background, individual vehicle/run routes, zoom/pan and timeline playback.
+- Map background, individual vehicle/run routes, wheel/pinch zoom up to 16×,
+  drag-to-pan and timeline playback.
+- Numbered kill-notification positions, per-kill details and nearby telemetry,
+  with optional explicitly estimated 2D connections when a target marker exists.
 - Telemetry charts, field minimum/maximum/mean, damage/repair episodes,
   searchable events, inferred player rosters and complete sample inspection.
 - Battle/sample JSON exports, persistent SQLite storage and automatic reward

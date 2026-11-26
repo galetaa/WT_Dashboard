@@ -96,6 +96,22 @@ class HistoryTests(unittest.TestCase):
         data = history.list_history(now=1150)
         self.assertEqual(data["battles"][0]["summary"]["vehicles"][0]["xp"],100)
 
+    def test_battle_detail_links_own_kill_to_its_recorded_sample(self):
+        self.sample(1001,"tankModels/germ_jaguar_2",0.1)
+        conn = db.get_conn()
+        with conn:
+            conn.execute("""INSERT INTO events(session_id,ts,match_time,kind,verb,actor_name,
+                          actor_vehicle,target_name,target_vehicle,raw_json)
+                          VALUES (1,1002,999,'damage','destroyed','Local','Jaguar 2','Enemy','T-54','{}')""")
+        conn.close()
+        data = history.analyze_session(1)
+        self.assertEqual(len(data["kill_reviews"]),1)
+        kill = data["kill_reviews"][0]
+        self.assertEqual(kill["origin"]["x"],0.1)
+        self.assertEqual(kill["t"],2)
+        self.assertEqual(kill["sample_id"],data["routes"][0]["points"][0]["sample_id"])
+        self.assertIsNone(kill["line"])
+
 
 if __name__ == "__main__":
     unittest.main()
