@@ -113,7 +113,12 @@ In a battle's **Route playback** panel, scroll the mouse wheel over the map,
 pinch with two fingers, double-click, or use **+ / −** to zoom (up to 16×).
 Wheel/pinch zoom keeps its focal point; drag to pan and **Reset view** to fit the
 whole map again. Route lines and numbered kill markers follow the playhead and
-selected vehicle/run.
+selected vehicle/run. A blue/green/red `Player` marker can describe a viewed
+vehicle after your death, while indicators still describe your destroyed tank.
+These spectator samples are excluded from your routes, observed vehicle time
+and kill origins, and split consecutive runs. Raw samples are retained. **Battle
+context, mission & recording coverage** shows how many spectator samples were
+excluded. Existing histories are recalculated automatically after an update.
 
 Enable **Kill positions** to show your vehicle's recorded positions near kill
 notifications. Click a marker, a **Kills in this battle** card, or **Review kill

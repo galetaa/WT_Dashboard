@@ -22,13 +22,13 @@ class HistoryTests(unittest.TestCase):
             conn.execute("INSERT INTO sessions(start_ts,end_ts,xp,silver) VALUES (200,900,40,-20)")
         conn.close()
 
-    def sample(self, ts, vehicle, x, speed=30):
+    def sample(self, ts, vehicle, x, speed=30, player_color=None):
         conn = db.get_conn()
         with conn:
             conn.execute("""INSERT INTO telemetry_samples(session_id,ts,state_json,indicators_json,map_obj_json,map_info_json,mission_json)
                             VALUES (1,?,'{}',?,?,?,?)""",
                          (ts,json.dumps({"type":vehicle,"army":"tank","speed":speed,"crew_current":3}),
-                          json.dumps([{"icon":"Player","x":x,"y":0.3}]),
+                          json.dumps([{"icon":"Player","x":x,"y":0.3,**({"color[]":player_color} if player_color else {})}]),
                           json.dumps({"valid":True,"map_min":[0,0],"map_max":[1000,1000]}),
                           json.dumps({"status":"success"})))
         conn.close()
@@ -48,6 +48,37 @@ class HistoryTests(unittest.TestCase):
         self.assertEqual(data["routes"][0]["end_s"],3)
         self.assertEqual(data["summary"]["vehicles"][1]["duration_s"],2)
         self.assertEqual(data["routes"][2]["duration_s"],0)
+
+    def test_spectator_points_do_not_create_vehicle_runs_or_change_distance(self):
+        raw = "tankModels/germ_jaguar_2"
+        gold, blue = [250,200,30], [23,77,255]
+        for ts,x,color in [(1001,.1,gold),(1003,.11,gold),(1004,.7,blue),
+                           (1005,.72,blue),(1006,.115,gold),(1008,.125,gold)]:
+            self.sample(ts,raw,x,player_color=color)
+        data = history.analyze_session(1)
+        self.assertEqual(len(data["routes"]),2)
+        self.assertEqual(data["summary"]["spectator_samples"],2)
+        self.assertEqual(data["summary"]["sample_count"],6)
+        self.assertEqual(data["summary"]["position_samples"],4)
+        self.assertEqual(data["summary"]["vehicles"][0]["samples"],4)
+        self.assertEqual(data["summary"]["vehicles"][0]["duration_s"],4)
+        self.assertAlmostEqual(data["summary"]["distance_m"],20)
+        self.assertEqual([point["x"] for run in data["routes"] for point in run["points"]],
+                         [.1,.11,.115,.125])
+        # Raw records remain available for inspection and re-analysis.
+        self.assertEqual(len(db.get_session_telemetry(1)),6)
+        self.assertEqual(json.loads(db.get_session_telemetry(1)[2]["map_obj_json"])[0]["color[]"],blue)
+        old_cache = dict(data["summary"],version=3,distance_m=999)
+        conn = db.get_conn()
+        with conn:
+            conn.execute("INSERT INTO session_metrics VALUES (?,?,?,?)",
+                         (1,old_cache["sample_id"],old_cache["event_count"],json.dumps(old_cache)))
+        conn.close()
+        history.ensure_metrics(1)
+        refreshed = history.list_history(now=1150)["battles"][0]["summary"]
+        self.assertEqual(refreshed["version"],4)
+        self.assertAlmostEqual(refreshed["distance_m"],20)
+        self.assertEqual(refreshed["spectator_samples"],2)
 
     def test_inspector_ranges_and_complete_sample_belong_to_battle(self):
         self.sample(1001,"tankModels/germ_jaguar_2",0.1,speed=10)

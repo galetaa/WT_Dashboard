@@ -62,7 +62,7 @@ window.HistoryInspector = (() => {
     el("battle-context").innerHTML=`<div class="snapshot-table">${tablePairs([
       ["Battle ID",s.id],["Started (local)",new Date(s.start_ts*1000).toLocaleString("en-GB")],
       ["Ended (local)",s.end_ts?new Date(s.end_ts*1000).toLocaleString("en-GB"):"Still recording"],
-      ["Stored telemetry samples",fmt(m.sample_count)],["Samples with own position",`${fmt(m.position_samples)} (${m.sample_count?fmt(m.position_samples/m.sample_count*100):0}%)`],
+      ["Stored telemetry samples",fmt(m.sample_count)],["Excluded spectator samples",fmt(m.spectator_samples)],["Samples with own position",`${fmt(m.position_samples)} (${m.sample_count?fmt(m.position_samples/m.sample_count*100):0}%)`],
       ["Recorded combat events",fmt(m.event_count)],["Reward source",s.rewards_source || "Not recorded"],
       ["Rewards observed",s.rewards_ts?new Date(s.rewards_ts*1000).toLocaleString("en-GB"):"Unknown"],
       ["Map background",!s.has_map_image?"Not recorded":s.map_image_verified?"Fresh in-match capture":"Legacy recorded image; not verified"],

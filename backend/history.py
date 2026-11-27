@@ -10,6 +10,7 @@ from collections import Counter
 import analysis
 import db
 import kill_review
+from map_positions import own_player_position, spectator_view
 
 
 def vehicle_label(raw):
@@ -91,6 +92,7 @@ def analyze_session(session_id, include_routes=True):
         fields = set()
         latest_map, latest_mission = {}, {}
         valid_position_count = 0
+        spectator_samples = 0
         review_frames = []
 
         def get_vehicle(raw):
@@ -125,7 +127,14 @@ def analyze_session(session_id, include_routes=True):
             if map_info.get("valid"):
                 latest_map = map_info
             raw = indicators.get("type")
-            if not analysis.is_real_vehicle(raw) or map_info.get("valid") is False:
+            if spectator_view(objects):
+                # Keep the raw row, but do not attach the viewed ally's position
+                # or inactive time to the destroyed vehicle still in indicators.
+                spectator_samples += 1
+                active, previous = None, None
+                continue
+            if (not analysis.is_real_vehicle(raw) or map_info.get("valid") is False
+                    or indicators.get("valid") is False):
                 active, previous = None, None
                 continue
             vehicle = get_vehicle(raw)
@@ -153,9 +162,7 @@ def analyze_session(session_id, include_routes=True):
                 runs.append(active)
                 previous = None
                 gap = 0
-            own = next((obj for obj in objects if obj.get("icon") == "Player"
-                        and number(obj.get("x")) and number(obj.get("y"))
-                        and 0 <= obj["x"] <= 1 and 0 <= obj["y"] <= 1), None)
+            own = own_player_position(objects)
             point = None
             if own:
                 valid_position_count += 1
@@ -235,14 +242,14 @@ def analyze_session(session_id, include_routes=True):
                     parameter.pop("sum",None)
         end_time = session["end_ts"] or last_time
         summary = {
-            "version": 3,
+            "version": 4,
             "player": player, "outcome": outcome,
             "end_ts": session["end_ts"], "reward_revision": reward_revision(rewards),
             "duration_s": max(0, end_time-session["start_ts"]),
             "sample_count": sample_count, "event_count": len(events), "sample_id": sample_id,
             "kills": kills, "deaths": deaths,
             "distance_m": sum(vehicle["distance_m"] for vehicle in vehicles.values()),
-            "position_samples": valid_position_count,
+            "position_samples": valid_position_count, "spectator_samples":spectator_samples,
             "vehicles": list(vehicles.values()),
         }
         if not include_routes:
@@ -265,7 +272,7 @@ def ensure_metrics(session_id):
         player_row = conn.execute("SELECT COALESCE(my_name,provisional_my_name),end_ts FROM sessions WHERE id=?", (session_id,)).fetchone()
         if row and row[1] == sample_id and row[2] == event_count:
             cached = json.loads(row[0])
-            if (cached.get("version") == 3 and cached.get("player") == player_row[0] and cached.get("end_ts") == player_row[1]
+            if (cached.get("version") == 4 and cached.get("player") == player_row[0] and cached.get("end_ts") == player_row[1]
                     and cached.get("reward_revision") == reward_revision(reward_details(conn, session_id))):
                 return
         summary = analyze_session(session_id, include_routes=False)

@@ -5,6 +5,7 @@ from collections import defaultdict, deque
 
 import db
 from runtime_paths import frontend_dir
+from map_positions import marker_role, own_player_position, spectator_view
 
 # Shared with the frontend's premium-highlight/wiki-link matching (see
 # vehicleIndex in frontend/app.js) - one dataset, refreshed by
@@ -268,7 +269,7 @@ VEHICLE_TYPES = {"ground_model", "aircraft", "ship"}
 def classify_faction(obj):
     if obj.get("type") not in VEHICLE_TYPES:
         return "unknown"
-    if obj.get("icon") == "Player":
+    if obj.get("icon") == "Player" and marker_role(obj) != "other":
         return "self"
     rgb = obj.get("color[]")
     if not rgb or len(rgb) < 3:
@@ -322,7 +323,9 @@ def compute_kill_locations(session_id: int):
         if before is None:
             continue
 
-        player_pos = next((o for o in before[1] if o.get("icon") == "Player"), None)
+        if spectator_view(before[1]):
+            continue
+        player_pos = own_player_position(before[1])
         enemies_before = [o for o in before[1] if "x" in o and classify_faction(o) == "enemy"]
         if not enemies_before:
             continue

@@ -85,6 +85,21 @@ class KillReviewTests(unittest.TestCase):
         self.assertEqual(k['origin']['x'],0)
         self.assertEqual(k['timestamp_basis'],'feed_received')
 
+    def test_spectated_ally_cannot_be_a_kill_origin(self):
+        ally={**OWN,'color[]':[23,77,255]}
+        kill=self.reviews([frame(1001,[ally,FRIEND])])[0]
+        self.assertIsNone(kill['origin'])
+        self.assertIsNone(kill['line'])
+        self.assertIn('spectator',kill['origin_note'])
+
+    def test_switch_to_spectator_does_not_identify_a_vanishing_target(self):
+        own={**OWN,'color[]':[250,200,30]}
+        ally={**OWN,'color[]':[23,77,255]}
+        kill=self.reviews([frame(1001,[own,FRIEND,ENEMY]),frame(1003,[ally,FRIEND])])[0]
+        self.assertIsNotNone(kill['origin'])
+        self.assertIsNone(kill['target'])
+        self.assertIsNone(kill['line'])
+
     def test_related_messages_are_limited_to_this_pair_and_nearby_time(self):
         related=event(id=2,ts=1001,verb='critically damaged')
         k=self.reviews([frame(1001)],[event(),related,event(id=3,ts=900,verb='hit')])[0]

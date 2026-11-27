@@ -153,7 +153,9 @@ XP is the game's reported battle EXP, which can differ from vehicle research
 RP. SL includes penalties and is before repair/ammunition costs. Unknown values
 remain unknown. Team assignments come from combat relationships, not an official
 scoreboard; route run counts are inferred, not confirmed deaths. Older stored map
-backgrounds are marked unverified. Decoded logs are never saved wholesale: only
+backgrounds are marked unverified. Post-death spectator markers are excluded
+from your vehicle routes and kill origins; the original telemetry remains
+available for inspection. Decoded logs are never saved wholesale: only
 battle statistics, combat events, nickname and import cursors are retained.
 
 ## Vehicle data and illustrations

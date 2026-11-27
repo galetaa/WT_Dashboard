@@ -4,6 +4,7 @@ import json
 import math
 
 import analysis
+from map_positions import own_player_position, spectator_view
 
 MAX_SAMPLE_AGE = 3.0
 
@@ -64,13 +65,16 @@ def build_reviews(session, events, frames):
         indicators=before['indicators']
         review.update(sample_id=before['sample_id'],sample_age_s=round(timestamp-before['ts'],3),
                       vehicle_type=indicators.get('type'),snapshot={'indicators':indicators,'state':before['state']})
-        valid=before['map_info'].get('valid') is not False and analysis.is_real_vehicle(indicators.get('type'))
-        own=next((obj for obj in before['objects'] if obj.get('icon')=='Player' and position(obj)),None) if valid else None
+        valid=(before['map_info'].get('valid') is not False and indicators.get('valid') is not False
+               and analysis.is_real_vehicle(indicators.get('type')))
+        own=own_player_position(before['objects']) if valid else None
         if own:
             review['origin']={'x':own['x'],'y':own['y'],'sample_id':before['sample_id']}
             review['origin_note']='Recorded own position near the kill notification, not a confirmed firing position.'
         else:
-            review['origin_note']='The nearby sample has no valid own-vehicle map position.'
+            review['origin_note']=('The nearby sample shows a spectator/other vehicle; its position is not yours.'
+                                   if spectator_view(before['objects']) else
+                                   'The nearby sample has no valid own-vehicle map position.')
         if event.get('actor_vehicle') and analysis.normalize_vehicle_id(indicators.get('type')) != analysis.normalize_vehicle_name(event['actor_vehicle']):
             review['origin']=None
             review['origin_note']='The sampled vehicle differs from the vehicle credited with this kill; position not assigned.'
@@ -87,7 +91,7 @@ def build_reviews(session, events, frames):
             after=frames[location+1] if location+1<len(frames) else None
             after_valid=after and 0 < after['ts']-timestamp <= MAX_SAMPLE_AGE and after['map_info'].get('valid') is not False and after['map_info'].get('map_generation')==before['map_info'].get('map_generation')
             if after_valid and after['indicators'].get('type')==indicators.get('type') and own:
-                new_own=next((o for o in after['objects'] if o.get('icon')=='Player' and position(o)),None)
+                new_own=own_player_position(after['objects'])
                 # A respawn, missing feed or simultaneous deaths cannot identify a disappearing marker.
                 continuous=new_own and math.hypot(new_own['x']-own['x'],new_own['y']-own['y']) < .05
                 same_team=[o for o in after['objects'] if position(o) and analysis.classify_faction(o)=='friendly']
